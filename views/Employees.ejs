@@ -1,0 +1,490 @@
+<div id="employeeContainer"></div>
+<form>
+    <div class="mb-3">
+      <label for="exampleInputEmail1" class="form-label">Email address</label>
+      <input type="email" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp">
+      <div id="emailHelp" class="form-text">We'll never share your email with anyone else.</div>
+    </div>
+    <div class="mb-3">
+      <label for="exampleInputPassword1" class="form-label">Password</label>
+      <input type="password" class="form-control" id="exampleInputPassword1">
+    </div>
+    <button id="submitButton" type="submit" class="btn btn-primary">Submit</button>
+  </form>
+
+  <!-- Add a new div for displaying messages -->
+  <div id="loginMessage" class="mt-3"></div>
+
+  <script>
+    var loggedInEmployeeRole;
+    var loginEmail;
+    var authToken;
+    const submitButton = document.getElementById("submitButton");
+    submitButton.addEventListener('click', async (event) => { // Added the 'event' parameter
+      try {
+        event.preventDefault(); // Prevent the default form submission behavior
+        const email = document.getElementById("exampleInputEmail1").value;
+        loginEmail = email;
+        console.log("login saved as: ", loginEmail);
+        const password = document.getElementById("exampleInputPassword1").value;
+        // Make AJAX request to the server
+        var response = await fetch('/user/LogIn', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, password }),
+        });
+  
+        var tokenInfo = await response.json();
+        var loginMessageBox = document.getElementById("loginMessage");
+        console.log(loginMessageBox);
+        console.log("Response of login was :", tokenInfo);
+        console.log(typeof(tokenInfo.token));
+        authToken = tokenInfo.token.token;
+        loggedInEmployeeRole = tokenInfo.token.authResult.user.role;
+
+        console.log(authToken);
+        localStorage.setItem('authToken', authToken);
+        if (tokenInfo.status == "Success") {
+          console.log("If condition ran");
+          loginMessageBox.innerHTML = "You have logged in successfully!!"; // Fixed typo
+        } else {
+          console.log("Else condition ran");
+          loginMessageBox.innerHTML = "Login Failed";
+        }
+        console.log(tokenInfo);
+  
+        // const authToken = localStorage.getItem('authToken');
+        console.log(`Token you are about to send is: ${authToken}`);
+        const responseDetails = await fetch('/user/getAllUserDetails', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authToken,
+          }
+        });
+  
+        const userDetails = await responseDetails.json();
+        // Handle the data here
+        console.log(userDetails);
+        console.log()
+        const employeeContainer = document.getElementById('employeeContainer');
+        console.log("User Response is: ", userDetails.response)
+        
+        // Fetched the reviews assigned to this user
+        const assignedReviewstemp = await fetch('/assignReview/findAssignedReview', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email:loginEmail}),
+        });
+
+        const assignedReviews = await assignedReviewstemp.json();
+        console.log("assignedReviews Fetched are: ", assignedReviews);
+        console.log(typeof(assignedReviews.reviews));
+        assignedReviewsEmails = new Set();
+        assignedReviews.reviews.forEach(element=>{
+          assignedReviewsEmails.add(element.email);
+        })
+        console.log(assignedReviewsEmails);
+
+        // Function to create a form group with select options
+        if(loggedInEmployeeRole == "Admin"){
+          function createFormGroup(userDetails, loginEmail, tempRole) {
+          // Create a div element with the form-group class
+          const formGroupDiv = document.createElement('div');
+          formGroupDiv.classList.add('form-group');
+          formGroupDiv.style.marginBottom = '20px';
+
+          // Create a label element for the select
+          const labelElement = document.createElement('label');
+          labelElement.setAttribute('for', 'reviewSelect');
+          labelElement.classList.add('form-label');
+          labelElement.textContent = `Assign ${tempRole}:`;
+
+          // Create a select element
+          const selectElement = document.createElement('select');
+          selectElement.setAttribute('id', 'reviewSelect');
+          selectElement.classList.add('form-select');
+          selectElement.setAttribute('aria-label', 'Select Review');
+
+          // Create default option
+          const defaultOption = document.createElement('option');
+          defaultOption.setAttribute('selected', 'selected');
+          defaultOption.setAttribute('disabled', 'disabled');
+          defaultOption.textContent = 'Select an option';
+
+          // Create options for the select
+          const options = userDetails.response
+            .filter(user => user.email !== loginEmail)
+            .map((user, index) => ({ value: `${index + 1}`, text: user.email }));
+
+          // Append options to select
+          options.forEach(option => {
+            const optionElement = document.createElement('option');
+            optionElement.setAttribute('value', option.value);
+            optionElement.textContent = option.text;
+            selectElement.appendChild(optionElement);
+          });
+
+          // Append label and select to the form group div
+          formGroupDiv.appendChild(labelElement);
+          formGroupDiv.appendChild(selectElement);
+
+          return formGroupDiv;
+        }
+
+        // Create two form groups with select options
+        const formGroup1 = createFormGroup(userDetails, loginEmail, 'Reviewee');
+        const formGroup2 = createFormGroup(userDetails, loginEmail, 'Reviewer');
+
+        // Create a form element
+        const formElement = document.createElement('form');
+        formElement.style.position = 'fixed';
+        formElement.style.top = '50%';
+        formElement.style.right = '5%';
+        formElement.style.transform = 'translateY(-90%)';
+        formElement.style.zIndex = '999';
+        formElement.appendChild(formGroup1);
+        formElement.appendChild(formGroup2);
+
+        // Create a submit button
+        const assignReviewButton = document.createElement('button');
+        assignReviewButton.setAttribute('type', 'submit');
+        assignReviewButton.classList.add('btn', 'btn-primary', 'position-fixed', 'top-50', 'end-0'); // Added 'position-fixed' class for fixed positioning
+        assignReviewButton.textContent = 'Assign Review';
+
+
+        // Add click event listener to the "Assign Review" button
+        assignReviewButton.addEventListener('click', async function() {
+          // Fetch values from the select fields
+          const selectValue1 = formGroup1.querySelector('select').value;
+          const selectValue2 = formGroup2.querySelector('select').value;
+
+          const email1 = userDetails.response[parseInt(selectValue1)].email;
+          const email2 = userDetails.response[parseInt(selectValue2)].email;
+          console.log(selectValue1, selectValue2);
+          console.log(email1, email2);
+          // Compare values and send fetch request if they are not equal
+          if (selectValue1 !== selectValue2) {
+            const response = await fetch('/assignReview/addNewAssignedReview', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: email1,
+                ReviewerEmail: email2,
+              }),
+            });
+
+            const result = await response.json();
+            console.log(result);
+
+            // Handle the response as needed
+          } else {
+            // Values are equal, handle accordingly or show a message
+            console.log('Selected values are equal');
+          }
+        });
+        // Append the form and submit button to the document body
+        document.body.appendChild(formElement);
+        document.body.appendChild(assignReviewButton);
+      }
+
+        // Counter for generating unique IDs
+        let buttonCounter = 1;
+        
+        userDetails.response.forEach(element => {
+            //  Check if the loginEmail and email are same
+            if (loggedInEmployeeRole == "Employee" && !assignedReviewsEmails.has(element.email) && element.email != loginEmail){
+              return;
+            }
+            // Create a unique ID for the button using the counter
+            let buttonId = `getReviews${buttonCounter}`;
+            
+            // Create card holder div element
+            let carddiv = document.createElement('div');
+            carddiv.classList.add('card', 'animate__animated', 'animate__zoomInDown');
+            carddiv.style.width = '35rem';
+
+            // Put image inside card
+            let cardImage = document.createElement('img');
+            cardImage.classList.add('card-img-top');
+            cardImage.src = `/images/${element.Name[0]}.gif`;
+            cardImage.alt = '...';
+            
+            // put image inside a card holder div
+            carddiv.append(cardImage);
+
+            // Make card body
+            let cardBodyDiv = document.createElement('div');
+            cardBodyDiv.classList.add('card-body');
+
+            // Elements that will be put inside body
+            
+            // 1) Card Title
+            let cardTitle = document.createElement('h5');
+            cardTitle.classList.add('fs-2', 'fw-bold', 'fst-italic');
+            cardTitle.innerHTML = element.Name;
+            
+            // 2) p text
+            let cardText = document.createElement('p');
+            cardText.classList.add("card-text", "fs-5", 'fst-italic', 'text-danger');
+            cardText.innerHTML = `Role: ${element.Role}`;
+
+            let deleteButton;
+            // Button will appear only when user is Admin.
+            if (loggedInEmployeeRole == "Admin" && element.Role == "Employee" && loginEmail !== element.email){
+              deleteButton = document.createElement('button');
+              deleteButton.classList.add("btn", "btn-warning");
+              // Set Id of this button:
+              deleteButton.setAttribute("id", buttonId);
+              deleteButton.setAttribute('value', `${element.email}`);
+              deleteButton.setAttribute("type", "button");
+              deleteButton.innerHTML = "Delete Employee Data";
+            }
+
+            let promoteToAdminButton;
+            // A button which will appear only when role is Admin
+            if(loggedInEmployeeRole == 'Admin' && loginEmail !== element.email && element.Role == "Employee" ){
+              // 3) View Reviews Button
+              promoteToAdminButton = document.createElement('button');
+              promoteToAdminButton.classList.add("btn", "btn-success");
+              // Set Id of this button:
+              promoteToAdminButton.setAttribute("id", buttonId);
+              promoteToAdminButton.setAttribute('value', `${element.email}`);
+              promoteToAdminButton.setAttribute("type", "button");
+              promoteToAdminButton.innerHTML = "Promote To Admin";
+            }
+
+            // 3) View Reviews Button
+            let getReviewsButton = document.createElement('button');
+            getReviewsButton.classList.add("btn", "btn-primary");
+            // Set Id of this button:
+            getReviewsButton.setAttribute("id", buttonId);
+            getReviewsButton.setAttribute('value', `${element.email}`);
+            getReviewsButton.setAttribute("type", "button");
+            getReviewsButton.innerHTML = "Get Reviews";
+
+            // 4) Set textArea for user to give Reviews
+            let textArea;
+            if(element.email !== loginEmail){
+              textArea = document.createElement('textarea');
+              textArea.classList.add('form-control');
+              textArea.setAttribute('rows', '4');
+              textArea.setAttribute('cols', '50');
+              textArea.setAttribute('name', 'Review');
+              textArea.setAttribute('form','userform');
+            }
+            // 5)Make a submit button for above textArea
+            let submitReviewButton 
+            if(element.email !== loginEmail){
+              submitReviewButton= document.createElement('button');
+              submitReviewButton.classList.add("btn", "btn-danger");
+              // Set Id of this button:
+              submitReviewButton.setAttribute("id", buttonId);
+              submitReviewButton.setAttribute('value', `${element.email}`);
+              submitReviewButton.setAttribute("type", "button");
+              submitReviewButton.innerHTML = "Submit Reviews";
+            }
+
+
+            // Put both in body
+            cardBodyDiv.append(cardTitle);
+            if(deleteButton){
+              cardBodyDiv.append(deleteButton);
+            }
+            cardBodyDiv.append(cardText);
+            if(promoteToAdminButton){
+              cardBodyDiv.append(promoteToAdminButton);
+            }
+            if(textArea){
+              cardBodyDiv.append(textArea);
+            }
+            if(submitReviewButton){
+              cardBodyDiv.append(submitReviewButton);
+            }
+              cardBodyDiv.append(getReviewsButton);
+            // Append the card body to the card div
+            carddiv.append(cardBodyDiv);
+            employeeContainer.append(carddiv);
+        });
+  
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    });
+
+    // Adding functionlity of Getting Employee Reviews Details
+    const getEmployeeReviewsButton = document.getElementById('getReviews');
+
+    // Attach a single event listener to the common ancestor
+    document.getElementById('employeeContainer').addEventListener('click', async function (event) {
+        // Check if the clicked element is a button with a class 'btn-primary'
+        if (event.target.classList.contains('btn-primary')) {
+            // Access the value associated with the clicked button
+            var email = event.target.value;
+
+            // Add closest card to make Changes
+            var card = event.target.closest('.card');
+            var cardbody = event.target.closest('.card-body');
+
+            // Your logic to get reviews using the email
+            console.log('Getting reviews for email:', email);
+        
+
+
+        var response = await  fetch('/Review/getEmployeeReview', {
+            method: 'POST',
+            headers: {
+            'Content-Type': 'application/json',
+            'authorization': authToken, 
+            },
+            body: JSON.stringify({email}),
+        })
+
+        const reviews = await response.json();
+        console.log(reviews);
+        console.log(typeof(reviews.Reviews));
+        
+        
+
+        if(reviews.status == "Success"){
+          // Check if there already exist a Reviews Container
+          const existingContainer = event.target.nextElementSibling;
+          console.log(existingContainer);
+          if(existingContainer){
+            existingContainer.remove();
+          }
+
+          //Make container of reviews so that we can pop it off to avoid duplication on multiple taps  
+          const reviewsStorageContainer = document.createElement('div');
+          reviewsStorageContainer.classList.add('ReviewsContainer');
+        
+
+          const reviewHeading = document.createElement('p');
+          reviewHeading.classList.add('fw-bold', 'fst-italic', 'fs-2', 'text-success');
+          reviewHeading.innerHTML = `REVIEWS: `;
+          reviewsStorageContainer.append(reviewHeading);
+            
+          reviews.Reviews.forEach(element=>{
+              const reviewsContainer1 = document.createElement('p');
+              reviewsContainer1.classList.add('fs-3', 'fw-bold', 'fst-italic');
+              reviewsContainer1.innerHTML = `    ${element.Name} :`;
+              const reviewsContainer2 = document.createElement('p');
+              reviewsContainer2.innerHTML = `           ${element.Review}`;
+              reviewsContainer2.classList.add('fs-4', 'fw-light', 'text-danger');
+              reviewsStorageContainer.append(reviewsContainer1);
+              reviewsStorageContainer.append(reviewsContainer2);
+            })
+
+            cardbody.append(reviewsStorageContainer);
+        }
+        
+        else{
+          const NoReviews = document.createElement('p');
+          NoReviews.innerHTML = `Sorry No Reviews found`;
+          card.append(NoReviews);
+        }
+      }
+      
+      if (event.target.classList.contains('btn-danger')){
+        console.log('Event of submitting review triggered');
+        var recipiantEmail = event.target.value;
+
+        // Add closest card to make Changes
+        var reviewText = event.target.previousElementSibling;
+        console.log(reviewText);
+      
+        // Your logic to Submit reviews for the email
+        var email = event.target.value;
+        console.log('Getting reviews for email:', email);
+
+        // Now send this Review to server
+        if(reviewText.value){
+          const Review = reviewText.value;
+          reviewText.value = '';
+
+          var response = await fetch('/Review/postReview', {
+            method:'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'authorization': authToken, 
+              },
+              body: JSON.stringify({Review, recipiantEmail}),
+          })
+        
+          const temp = await response.json();
+          console.log(temp);
+
+          // Dispatch the event on the element
+          const getReviewButton = event.target.nextElementSibling;
+
+          console.log('dispatchEvent initiated');
+          console.log(getReviewButton);
+        
+          getReviewButton.click();
+        }
+      }
+      
+      // Promote to Admin button trigger
+      if(event.target.classList.contains('btn-success')){
+        console.log("Promote to Admin event triggered");
+        const employeeRole = event.target.previousElementSibling;
+        // const employeeDelteButton = employeeRole.previousElementSibling;
+        const employeeEmail = event.target.value;
+
+        var response = await fetch('/user/makeAdmin', {
+          method:'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'authorization': authToken, 
+          },
+          body: JSON.stringify({employeeEmail}),
+
+        })
+
+        const temp = await response.json();
+        console.log(temp);
+        if(temp.status == "Success"){
+          employeeRole.innerHTML = "Admin";
+          event.target.remove();
+          // employeeDelteButton.remove();
+        }
+      }
+
+      // Making delete button functionality
+      if(event.target.classList.contains('btn-warning')){
+        console.log("Delete data button triggered");
+        const employeeEmail = event.target.value;
+
+        var response = await fetch('/user/deleteEmployee', {
+          method:'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'authorization': authToken, 
+          },
+          body: JSON.stringify({employeeEmail}),
+        })
+
+        const temp = await response.json();
+        console.log(temp);
+
+        // Empty the employeeContainer
+        document.getElementById('employeeContainer').innerHTML = '';
+        
+        // Dispatch the event on the element
+        const myButton = document.getElementById('submitButton');
+        
+        // Create a new event (e.g., a click event)
+        const clickEvent = new Event('click');
+        
+        myButton.dispatchEvent(clickEvent);     
+      }
+    });    
+  </script>
+  
+  

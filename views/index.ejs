@@ -1,0 +1,118 @@
+<p class="fst-italic text-danger animate__animated animate__flip animate__hinge" style="margin-left: 10%; font-size: 10vh;">Welcome To Employee Review</p>
+
+<button type="button" id="beginButton" class="btn btn-primary d-block text-capitalize fw-bold mx-auto my-5 p-4">Give Review</button>
+
+<div class="container mt-5">
+    <h1 class="display-4 text-center mb-4 fw-bold fst-italic">REGISTER NOW</h1>
+    <p class="text-center mb-4" style="font-size: 20px;">(Note: If not registered already)</p>
+
+    <form id="AddEmployeeForm">
+        <div class="mb-3">
+            <label for="inputEmail" class="form-label">Email</label>
+            <input type="email" class="form-control" id="inputEmail" placeholder="Bruno@gmail.com">
+        </div>
+        <div class="mb-3">
+            <label for="inputPassword" class="form-label">Password</label>
+            <input type="password" class="form-control" id="inputPassword" placeholder="123">
+        </div>
+        <div class="mb-3">
+            <label for="inputRole" class="form-label">Role</label>
+            <select class="form-select" id="inputRole">
+                <option value="Employee" selected>Employee</option>
+                <option value="Admin">Admin</option>
+                <!-- Add other role options as needed -->
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="inputName" class="form-label">Name</label>
+            <input type="text" class="form-control" id="inputName" placeholder="Bruno" >
+        </div>
+        <div class="mb-3">
+            <label for="inputAge" class="form-label">Age</label>
+            <input type="number" class="form-control" id="inputAge" placeholder="21">
+        </div>
+        <button type="submit" class="btn btn-primary" id="formSubmitButton">Submit</button>
+    </form>
+</div>
+
+<p id="formErrorContainer" style="font-size: 20px; color: red; margin-left: 20%;"></p>
+<p id="formSubmissionSuccess" style="font-size: 20px; color: green; margin-left: 20%;"></p>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', async ()=>{
+        
+        const errorContainer = document.getElementById('formErrorContainer');
+        function appenError(info){
+            const pcontainer = document.createElement('p')
+            pcontainer.innerHTML = `${info} is required`;
+            errorContainer.append(pcontainer);
+        }
+
+        // Find the button by its id
+        var beginButton = document.querySelector('#beginButton');
+
+        // Add a click event listener to the button
+        beginButton.addEventListener('click', ()=>{
+            // Perform an action when the button is clicked
+            window.location.href = 'Employees';
+        });
+
+        const submitButton = document.getElementById('formSubmitButton');
+        submitButton.addEventListener('click', async ()=>{
+            event.preventDefault();
+            let email = document.getElementById('inputEmail').value;
+            let password = document.getElementById('inputPassword').value;
+            let Role = document.getElementById('inputRole').value;
+            let Name = document.getElementById('inputName').value;
+            let Age = document.getElementById('inputAge').value;
+            
+            console.log(email, password, Role, Name, Age);
+            if(!email || !password || !Role || !Name || !Age){
+                
+                if(!email){
+                    appenError('email');
+                }
+
+                if(!password){
+                    appenError('password');
+                }
+
+                if(!Role){
+                    appenError('Role');
+                }
+
+                if(!Name){
+                    appenError('Name');
+                }
+
+                if(!Age){
+                    appenError('Age');
+                }
+
+                return;
+            }
+
+            var response = await fetch('/user/registerUser', {
+                method:'POST',
+                headers: {
+                    'Content-Type': 'application/json', 
+                },
+                body: JSON.stringify({email, password, Role, Name, Age}),
+            })
+
+            const temp = await response.json();
+            console.log(temp);
+
+            if(temp.status == "Success"){
+                document.getElementById('formSubmissionSuccess').innerHTML = "Registered Successfully!";
+            }
+            document.getElementById('inputEmail').value = '';
+            document.getElementById('inputPassword').value = '';
+            
+            document.getElementById('inputName').value = '';
+            document.getElementById('inputAge').value = '';
+        })
+    });
+
+</script>
